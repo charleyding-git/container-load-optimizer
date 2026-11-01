@@ -70,6 +70,63 @@ Weight enters the criterion naturally — at the same support ratio, an 8 kg lig
 
 ---
 
+## Install as a Skill
+
+### Option 1 — clone into your skills directory (recommended)
+
+This repository *is* a standard skill package (`SKILL.md` + `scripts/` + `references/`). Put the whole thing in the right directory and it gets picked up:
+
+```bash
+# WorkBuddy
+git clone https://github.com/charleyding-git/container-load-optimizer.git \
+    ~/.workbuddy/skills/container-load-optimizer
+
+# Claude Code
+git clone https://github.com/charleyding-git/container-load-optimizer.git \
+    ~/.claude/skills/container-load-optimizer
+```
+
+Then install the one dependency:
+
+```bash
+pip install -r ~/.workbuddy/skills/container-load-optimizer/requirements.txt
+```
+
+### Option 2 — use it as a plain CLI tool (no skill install)
+
+```bash
+git clone https://github.com/charleyding-git/container-load-optimizer.git
+cd container-load-optimizer
+pip install -r requirements.txt
+python scripts/pipeline.py --input manifest.xlsx --config cfg.json --outdir out/
+```
+
+### How to trigger it in WorkBuddy / Claude Code
+
+Once installed, just say what you need in plain language — no commands to memorize:
+
+| You say | What happens |
+|---|---|
+| "How many containers does this order need?" | Reads your Excel → solves → reports container count and utilization |
+| "Make a loading plan" | Produces container count + per-pallet job cards + a 3D loading view |
+| "Compare palletized vs no-pallet" | Solves both and compares container count and utilization |
+| "packing plan" / "container loading plan" | Same (the SKILL.md description lists both Chinese and English trigger words) |
+
+The agent reads `SKILL.md` and follows the whole workflow, **enforcing the four validation layers** — if validation fails it reports the failure rather than handing you an approximate plan.
+
+### Layout
+
+```
+container-load-optimizer/     ← put this whole directory in your skills dir
+├── SKILL.md                  ← agent instructions (frontmatter + workflow + key design decisions)
+├── scripts/                  ← executable scripts (called by the agent)
+├── references/               ← detail docs, read on demand
+├── assets/                   ← input template
+└── ui/                       ← local web console
+```
+
+---
+
 ## Quick start
 
 ### CLI
