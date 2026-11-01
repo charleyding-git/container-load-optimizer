@@ -67,6 +67,63 @@ BCT = ECT × Z × C × √(h·P)     # 凯利卡特公式
 
 ---
 
+## 安装为 Skill
+
+### 方式一：直接 clone 到 skills 目录（推荐）
+
+本仓库本身就是一个标准 Skill 包（`SKILL.md` + `scripts/` + `references/`），放进对应目录即可被识别：
+
+```bash
+# WorkBuddy
+git clone https://github.com/charleyding-git/container-load-optimizer.git \
+    ~/.workbuddy/skills/container-load-optimizer
+
+# Claude Code
+git clone https://github.com/charleyding-git/container-load-optimizer.git \
+    ~/.claude/skills/container-load-optimizer
+```
+
+装完依赖即可用：
+
+```bash
+pip install -r ~/.workbuddy/skills/container-load-optimizer/requirements.txt
+```
+
+### 方式二：只当命令行工具用（不装 skill）
+
+```bash
+git clone https://github.com/charleyding-git/container-load-optimizer.git
+cd container-load-optimizer
+pip install -r requirements.txt
+python scripts/pipeline.py --input 订单.xlsx --config cfg.json --outdir out/
+```
+
+### 在 WorkBuddy / Claude Code 里怎么触发
+
+安装后直接用自然语言说需求即可，无需记命令：
+
+| 你说的话 | 会发生什么 |
+|---|---|
+| 「这批货要几个柜」 | 读你的 Excel → 求解 → 给出柜数与装载率 |
+| 「做个装载方案」 | 输出柜数 + 逐托作业卡 + 3D 装载图 |
+| 「对比有托盘和无托盘」 | 同时算两套方案，给出柜数与装载率对比 |
+| 「装柜方案」/「container loading plan」 | 同上（SKILL.md 描述里已列中英触发词） |
+
+Agent 会自动读取 `SKILL.md` 走完整流程，**并强制执行四层校验**——校验不通过会直接报错，不会给你一个"大概"的方案。
+
+### 目录结构说明
+
+```
+container-load-optimizer/     ← 这个目录整体放进 skills 目录
+├── SKILL.md                  ← Agent 指令 (frontmatter + 工作流 + 关键设计决策)
+├── scripts/                  ← 可执行脚本 (Agent 调用)
+├── references/               ← 按需查阅的详细文档
+├── assets/                   ← 输入模板
+└── ui/                       ← 本地网页控制台
+```
+
+---
+
 ## Quick start
 
 ### CLI
