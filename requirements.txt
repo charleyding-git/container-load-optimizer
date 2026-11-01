@@ -1,0 +1,8 @@
+# 集装箱装载优化器 —— 运行时依赖
+#
+# 刻意保持极简: 除 openpyxl 外全部使用 Python 标准库,
+# 这样在容器 / 云主机 / 任何 Python 3.9+ 环境都能零配置启动。
+#
+#   pip install -r requirements.txt
+#
+openpyxl>=3.0.0

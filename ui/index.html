@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>集装箱装载优化 · 控制台</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f1f5f9;color:#0f172a;
+ font-family:Inter,"Segoe UI",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+ font-size:14px;line-height:1.6}
+.top{background:linear-gradient(135deg,#0f172a,#1e3a8a);color:#fff;padding:18px 26px}
+.top h1{margin:0;font-size:19px}
+.top .s{font-size:12.5px;color:#cbd5e1;margin-top:3px}
+.top .langbar{margin-top:10px;display:flex;align-items:center;gap:4px}
+.top .langbar .f{color:#cbd5e1;font-size:12.5px}
+.top .langbar select{background:#1e293b;color:#fff;border:1px solid #334155;border-radius:6px;
+ padding:4px 9px;font-size:12.5px;font-family:inherit;cursor:pointer}
+.wrap{max-width:1420px;margin:0 auto;padding:18px;display:grid;
+ grid-template-columns:340px 1fr;gap:16px;align-items:start}
+.card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(15,23,42,.08);
+ border:1px solid #e2e8f0;margin-bottom:14px;overflow:hidden}
+.card h2{margin:0;padding:12px 16px;font-size:14px;background:#f8fafc;
+ border-bottom:1px solid #e2e8f0;color:#1e293b}
+.card .bd{padding:14px 16px}
+label.f{display:block;font-size:12.5px;font-weight:600;color:#334155;margin:11px 0 5px}
+select,input[type=file],input[type=number],input[type=text]{width:100%;padding:8px 10px;
+ border:1px solid #cbd5e1;border-radius:7px;font-size:13px;font-family:inherit;background:#fff}
+select:focus,input:focus{outline:2px solid #bfdbfe;border-color:#60a5fa}
+.chk{display:flex;align-items:flex-start;gap:8px;padding:7px 0;font-size:13px;cursor:pointer}
+.chk input{width:15px;height:15px;margin-top:2px;flex:none;accent-color:#2563eb}
+.chk .hint{display:block;font-size:11.5px;color:#64748b;font-weight:400;line-height:1.45}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.radios{display:flex;flex-direction:column;gap:2px}
+.radios label{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border-radius:8px;
+ cursor:pointer;font-size:13px;border:1px solid transparent}
+.radios label:hover{background:#f8fafc}
+.radios input{accent-color:#2563eb;margin-top:2px}
+.radios .hint{display:block;font-size:11.5px;color:#64748b}
+.radios label.on{border-color:#93c5fd;background:#eff6ff}
+.btn{width:100%;padding:11px;border:none;border-radius:9px;font-size:14px;font-weight:600;
+ cursor:pointer;font-family:inherit;transition:.15s}
+.btn.p{background:#2563eb;color:#fff}
+.btn.p:hover{background:#1d4ed8}
+.btn.p:disabled{background:#94a3b8;cursor:not-allowed}
+.btn.s{background:#fff;color:#334155;border:1px solid #cbd5e1;margin-top:8px}
+.btn.s:hover{background:#f8fafc}
+.stage{background:#f8fafc;border-radius:12px;overflow:hidden;position:relative;
+ box-shadow:0 4px 24px rgba(0,0,0,.12);border:1px solid #e2e8f0}
+#cv{display:block;width:100%;height:680px;cursor:grab}
+#cv:active{cursor:grabbing}
+.hud{position:absolute;left:12px;top:12px;background:rgba(15,23,42,.92);padding:10px 14px;
+ border-radius:9px;font-size:12.5px;line-height:1.8;pointer-events:none;color:#e2e8f0}
+.hud b{color:#fff}.hud .k{color:#94a3b8}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.toolbar button,.toolbar select{padding:7px 12px;border:1px solid #cbd5e1;border-radius:7px;
+ background:#fff;font-size:13px;cursor:pointer;font-family:inherit}
+.toolbar button:hover,.toolbar select:hover{background:#f1f5f9}
+.toolbar button.on{background:#2563eb;border-color:#2563eb;color:#fff}
+.spacer{flex:1}
+.res{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px}
+.stat{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:11px 13px}
+.stat .n{font-size:22px;font-weight:700;color:#0f172a;line-height:1.25}
+.stat .l{font-size:11.5px;color:#64748b}
+.stat.ok .n{color:#16a34a}.stat.bad .n{color:#dc2626}.stat.warn .n{color:#d97706}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th{background:#f1f5f9;padding:7px 9px;text-align:left;font-weight:600;
+ border-bottom:1px solid #e2e8f0;color:#334155}
+table.t td{padding:6px 9px;border-bottom:1px solid #f1f5f9}
+table.t tr:last-child td{border-bottom:none}
+.ok-box{background:#f0fdf4;border:1px solid #bbf7d0;border-left:3px solid #16a34a;
+ border-radius:7px;padding:11px 13px;font-size:12.5px;margin-bottom:10px}
+.bad-box{background:#fef2f2;border:1px solid #fecaca;border-left:3px solid #dc2626;
+ border-radius:7px;padding:11px 13px;font-size:12.5px;margin-bottom:10px}
+.warn-box{background:#fffbeb;border:1px solid #fde68a;border-left:3px solid #d97706;
+ border-radius:7px;padding:11px 13px;font-size:12.5px;margin-bottom:10px}
+pre{background:#0f172a;color:#cbd5e1;padding:11px;border-radius:8px;font-size:11.5px;
+ overflow:auto;max-height:280px;margin:0;font-family:Consolas,Monaco,monospace}
+.legend{display:flex;flex-wrap:wrap;gap:5px 13px;margin-top:11px;font-size:12px;color:#475569}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;
+ vertical-align:-1px;border:1px solid rgba(0,0,0,.15)}
+.tag{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:99px;margin-left:5px}
+.tag.h{background:#fee2e2;color:#b91c1c}
+.tag.s{background:#dbeafe;color:#1d4ed8}
+.note{font-size:11.5px;color:#64748b;line-height:1.6;margin-top:9px}
+#log{position:fixed;right:16px;bottom:16px;background:#0f172a;color:#e2e8f0;
+ padding:9px 14px;border-radius:9px;font-size:12.5px;box-shadow:0 6px 24px rgba(0,0,0,.28);
+ opacity:0;transition:.25s;pointer-events:none;max-width:420px}
+#log.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1 data-i18n="title">集装箱装载优化 · 控制台</h1>
+  <div class="s" data-i18n="subtitle">参数勾选 → 上传数据 → 一键求解 → 3D 预览 → 导出三件套（含自动校验门禁）</div>
+  <div class="langbar">
+    <label class="f" style="display:inline-block;margin:0" data-i18n="langLabel">界面语言</label>
+    <select id="lang" style="width:auto;display:inline-block;margin-left:8px">
+      <option value="zh">中文</option>
+      <option value="en">English</option>
+    </select>
+  </div>
+</div>
+
+<div class="wrap">
+  <!-- ============ 左栏: 参数 ============ -->
+  <div>
+    <div class="card">
+      <h2 data-i18n="secInput">① 输入数据</h2>
+      <div class="bd">
+        <label class="f" data-i18n="excelLabel">Excel 数据文件（每个 sheet = 一个批次）</label>
+        <input type="file" id="file" accept=".xlsx,.xls">
+        <div class="note" data-i18n="tplHint">模板可在 skill 的 <code>assets/输入模板.xlsx</code>，
+          或用 <code>scripts/make_template.py</code> 生成。</div>
+        <button class="btn s" id="tmpl" data-i18n="dlTpl">下载空白模板</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="secBox">② 集装箱柜型</h2>
+      <div class="bd">
+        <label class="f" data-i18n="boxSpec">柜型规格</label>
+        <select id="container"></select>
+        <div class="note" id="cdesc"></div>
+        <label class="f" data-i18n="palSpec">托盘规格</label>
+        <select id="pallet"></select>
+        <div class="note" id="pdesc"></div>
+        <div id="customPal" style="display:none">
+          <div class="row">
+            <div><label class="f">长(mm)</label><input type="number" id="cpl" value="1219.2" step="0.1"></div>
+            <div><label class="f">宽(mm)</label><input type="number" id="cpw" value="1016" step="0.1"></div>
+          </div>
+          <label class="f">托盘自身高(mm)</label>
+          <input type="number" id="cph" value="145" step="1">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="secMode">③ 装载方式</h2>
+      <div class="bd">
+        <div class="radios" id="modeSel">
+          <label class="on"><input type="radio" name="mode" value="pallet" checked>
+            <span data-i18n="modePallet">有托盘模式<span class="hint">打托码垛，适合机械装卸与整托周转</span></span></label>
+          <label><input type="radio" name="mode" value="nopallet">
+            <span data-i18n="modeNoPallet">无托盘模式<span class="hint">货垛柱直装，叉车直接上下货</span></span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="secCons">④ 装载约束</h2>
+      <div class="bd">
+        <div id="palletCons">
+          <label class="chk"><input type="checkbox" id="mono" checked>
+            <span data-i18n="cMono">一托一 SKU（硬约束）<span class="hint">同一托盘只放一种 SKU。取消则允许层间混装 —— 托盘填充率更高、柜数更少，但需贴 Mixed SKU 标签</span></span></label>
+          <label class="chk"><input type="checkbox" id="top" checked>
+            <span data-i18n="cTop">允许托盘顶部平躺散放<span class="hint">利用托盘顶部剩余高度平躺放箱，软约束</span></span></label>
+          <label class="chk"><input type="checkbox" id="dbl">
+            <span data-i18n="cDbl">允许双层托盘<span class="hint">一个托盘上再放一个托盘。硬约束，涉及叉车作业与收货区高度</span></span></label>
+
+          <label class="f">TiHi 带板层数（GB/T 托盘共用系统标准）</label>
+          <select id="tihi">
+            <option value="" data-i18n="optNone">不限制</option>
+            <option value="1" data-i18n="tihi1">1 层 — 货高 ≤1800mm</option>
+            <option value="2" data-i18n="tihi2">2 层 — 货高 ≤1200mm</option>
+            <option value="3" data-i18n="tihi3">3 层 — 货高 ≤800mm</option>
+            <option value="4" data-i18n="tihi4">4 层 — 货高 ≤600mm</option>
+          </select>
+
+          <label class="f">收货区托盘货物限高（mm，含托盘）</label>
+          <input type="number" id="maxh" placeholder="不限制" step="10" data-i18n-ph="optNone">
+          <div class="note" data-i18n="nMaxh">超过收货区/货架高度会被拒收。留空不限制。</div>
+
+          <label class="f">单托限重（kg）</label>
+          <input type="number" id="maxw" placeholder="不限制" step="10" data-i18n-ph="optNone">
+          <div class="note" data-i18n="nMaxw">Amazon FBA 单托毛重上限 500kg。</div>
+        </div>
+
+        <label class="f">支撑率策略</label>
+        <select id="supportPolicy">
+          <option value="balanced" data-i18n="spBalanced">均衡 — 修复支撑率明显不足的层（推荐）</option>
+          <option value="relaxed_all" data-i18n="spRelaxed">放任 — 仅修「完全悬空」，其余提示后由缠绕膜/捆扎兜底（柜数最少）</option>
+          <option value="strict" data-i18n="spStrict">严格 — 支撑率作硬约束，绝不放宽（柜数最多、耗时最长）</option>
+        </select>
+        <label class="chk"><input type="checkbox" id="reorder">
+          <span data-i18n="cReorder">启用层序优化<span class="hint">把支撑不佳的层挪到托盘上部（上方载荷小、风险低）。可消除完全悬空，但可能多 1 个柜</span></span></label>
+        <label class="chk"><input type="checkbox" id="support" checked>
+          <span data-i18n="cSupport">启用垂直支撑率校验<span class="hint">按 GB/T 16470 报告 75% 建议值；是否阻断交付由上方策略决定</span></span></label>
+        <label class="chk"><input type="checkbox" id="cog" checked>
+          <span data-i18n="cCog">启用重心偏移校验<span class="hint">整柜重心横向偏移 ≤ 柜宽 15%，防偏载（校验项）</span></span></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="secGoal">⑤ 求解目标</h2>
+      <div class="bd">
+        <div class="radios" id="optSel">
+          <label class="on"><input type="radio" name="opt" value="containers" checked>
+            <span data-i18n="gAuto">自动优化 — 柜数最少<span class="hint">软约束可放宽以减少柜数（如允许混装/顶部散放）</span></span></label>
+          <label><input type="radio" name="opt" value="strict">
+            <span data-i18n="gStrict">严格按设定计算<span class="hint">硬约束绝不违反，即使多几个柜</span></span></label>
+        </div>
+        <label class="f">求解轮数（越大越稳，越慢）</label>
+        <input type="number" id="restarts" value="12" min="1" max="40">
+      <label class="chk" style="margin-top:10px"><input type="checkbox" id="both" checked>
+        <span data-i18n="cBoth">同时求解另一装载方式<span class="hint">一次算出托盘+无托盘两套，3D 可视化里用「模式」下拉切换对比</span></span></label>
+        <label class="f">柜数硬上限（按批次，留空=不限制）</label>
+        <input type="number" id="maxc" placeholder="不限制" min="1" max="40" data-i18n-ph="optNone">
+        <div class="note" data-i18n="nMaxc">超过此柜数的最末柜会溶解，其箱改放前 N 柜柜底裸地（守住上限、不增柜）。<b>设 7 即锁死每批次 ≤7 柜</b>（FSA 订单要求）。留空则不限制。</div>
+      </div>
+    </div>
+
+    <button class="btn p" id="solve" data-i18n="btnSolve">开始求解</button>
+    <button class="btn s" id="export" disabled data-i18n="btnExport">导出三件套</button>
+    <div class="note" id="status"></div>
+  </div>
+
+  <!-- ============ 右栏: 结果 ============ -->
+  <div>
+    <div class="res" id="stats"></div>
+
+    <div class="toolbar">
+      <select id="modeSel2"><option value="__" data-i18n="allModes">全部模式</option></select>
+      <select id="batch"></select>
+      <button id="prev" data-i18n="btnPrev">◀ 上一柜</button><button id="next" data-i18n="btnNext">下一柜 ▶</button>
+      <button id="play" data-i18n="replay">▶ 播放装载顺序</button><button id="reset" data-i18n="btnReset">重置视角</button>
+      <span class="spacer"></span>
+      <button id="wire" data-i18n="btnWire">线框模式</button>
+    </div>
+
+    <div class="stage">
+      <canvas id="cv"></canvas>
+      <div class="hud" id="hud"></div>
+    </div>
+    <div class="legend" id="legend"></div>
+
+    <div class="card" style="margin-top:14px">
+      <h2 data-i18n="secGate">校验报告</h2>
+      <div class="bd">
+        <div id="gate"></div>
+        <div class="note" data-i18n="nGate">校验分四层：<b>L1 几何</b>（出界/重叠/层高/门高）·
+          <b>L2 稳定性承重</b>（支撑率/重心/载重/堆码层数）·
+          <b>L3 三方一致性</b>（plan↔xlsx↔3D）·
+          <b>L4 视觉审查</b>（由上层流程执行目视复核）。任一 L1/L2/L3 报错即禁止交付。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="secTable">各柜明细</h2>
+      <div class="bd" style="max-height:320px;overflow:auto">
+        <table class="t" id="tbl"><thead><tr>
+          <th data-i18n="thContainer">柜</th><th data-i18n="modeLabel">模式</th>
+          <th data-i18n="thBatch">批次</th><th data-i18n="thCartons">箱</th>
+          <th data-i18n="thCbm">CBM</th><th data-i18n="thUtil">装载率</th>
+          <th data-i18n="thPallets">托盘</th><th data-i18n="thTop">顶高</th>
+          <th data-i18n="thSku">SKU 分布</th></tr></thead>
+          <tbody></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="log"></div>
+
+<script>
+// ============================================================
+// i18n —— 界面文案目录 (zh / en)
+// 切换语言时按 [data-i18n] 替换元素内容; 支持嵌套 <span class="hint">
+// ============================================================
+const I18N={
+zh:{
+ title:'集装箱装载优化 · 控制台',
+ subtitle:'参数勾选 → 上传数据 → 一键求解 → 3D 预览 → 导出三件套（含自动校验门禁）',
+ langLabel:'界面语言',
+ secInput:'① 输入数据',
+ excelLabel:'Excel 数据文件（每个 sheet = 一个批次）',
+ tplHint:'模板可在 skill 的 <code>assets/输入模板.xlsx</code>，或用 <code>scripts/make_template.py</code> 生成。',
+ dlTpl:'下载空白模板',
+ secBox:'② 集装箱柜型',
+ boxSpec:'柜型规格',
+ palSpec:'托盘规格',
+ secMode:'③ 装载方式',
+ modePallet:'有托盘模式<span class="hint">打托码垛，适合机械装卸与整托周转</span>',
+ modeNoPallet:'无托盘模式<span class="hint">货垛柱直装，叉车直接上下货</span>',
+ secCons:'④ 装载约束',
+ cMono:'一托一 SKU（硬约束）<span class="hint">同一托盘只放一种 SKU。取消则允许层间混装 —— 托盘填充率更高、柜数更少，但需贴 Mixed SKU 标签</span>',
+ cTop:'允许托盘顶部平躺散放<span class="hint">利用托盘顶部剩余高度平躺放箱，软约束</span>',
+ cDbl:'允许双层托盘<span class="hint">一个托盘上再放一个托盘。硬约束，涉及叉车作业与收货区高度</span>',
+ cReorder:'启用层序优化<span class="hint">把支撑不佳的层挪到托盘上部（上方载荷小、风险低）。可消除完全悬空，但可能多 1 个柜</span>',
+ cSupport:'启用垂直支撑率校验<span class="hint">按 GB/T 16470 报告 75% 建议值；是否阻断交付由上方策略决定</span>',
+ cCog:'启用重心偏移校验<span class="hint">整柜重心横向偏移 ≤ 柜宽 15%，防偏载（校验项）</span>',
+ secGoal:'⑤ 求解目标',
+ gAuto:'自动优化 — 柜数最少<span class="hint">软约束可放宽以减少柜数（如允许混装/顶部散放）</span>',
+ gStrict:'严格按设定计算<span class="hint">硬约束绝不违反，即使多几个柜</span>',
+ cBoth:'同时求解另一装载方式<span class="hint">一次算出托盘+无托盘两套，3D 可视化里用「模式」下拉切换对比</span>',
+ secGate:'校验报告',
+ secTable:'各柜明细',
+ optNone:'不限制',
+ tihi1:'1 层 — 货高 ≤1800mm', tihi2:'2 层 — 货高 ≤1200mm',
+ tihi3:'3 层 — 货高 ≤800mm', tihi4:'4 层 — 货高 ≤600mm',
+ spBalanced:'均衡 — 修复支撑率明显不足的层（推荐）',
+ spRelaxed:'放任 — 仅修「完全悬空」，其余提示后由缠绕膜/捆扎兜底（柜数最少）',
+ spStrict:'严格 — 支撑率作硬约束，绝不放宽（柜数最多、耗时最长）',
+ nMaxh:'超过收货区/货架高度会被拒收。留空不限制。',
+ nMaxw:'Amazon FBA 单托毛重上限 500kg。',
+ nMaxc:'超过此柜数的最末柜会溶解，其箱改放前 N 柜柜底裸地（守住上限、不增柜）。<b>设 7 即锁死每批次 ≤7 柜</b>。留空则不限制。',
+ btnSolve:'开始求解', btnExport:'导出三件套',
+ nGate:'校验分四层：<b>L1 几何</b>（出界/重叠/层高/门高）·<b>L2 稳定性承重</b>（支撑率/重心/载重/堆码层数）·<b>L3 三方一致性</b>（plan↔xlsx↔3D）·<b>L4 视觉审查</b>（由上层流程执行目视复核）。任一 L1/L2/L3 报错即禁止交付。',
+ allModes:'全部模式',
+ allBatches:'全部批次',
+ btnPrev:'◀ 上一柜', btnNext:'下一柜 ▶',
+ btnReset:'重置视角', btnWire:'线框模式',
+ statContainers:'柜数', statCartons:'纸箱', statCbm:'CBM',
+ statValidation:'L1+L2 校验', statWarn:'警告', statElapsed:'耗时',
+ batchLabel:'批次', modeLabel:'模式',
+ thContainer:'柜', thBatch:'批次', thCartons:'箱', thCbm:'CBM',
+ thUtil:'装载率', thPallets:'托盘', thTop:'顶高', thSku:'SKU 分布',
+ gateOk:'✓ L1 几何 / L2 稳定性校验全部通过，方案可交付。',
+ gateBad:'✗ 存在 <b>{n}</b> 项错误，按门禁规则 <b>禁止交付</b>，请查看下方明细并修正输入或约束。',
+ gateWarn:'! {n} 项警告（不阻断交付，但需在方案说明中注明）。',
+ consTitle:'本次生效的约束：',
+ solving:'正在求解与校验，请稍候…',
+ solved:'求解完成: {c} 柜 / {n} 箱 / {t}s',
+ solveFail:'求解失败: {e}',
+ needFile:'请先选择 Excel 数据文件',
+ reqFail:'请求失败: {e}',
+ exported:'已导出: {f} + {z}',
+ exportFail:'导出失败: {e}',
+ noResult:'尚无结果',
+ noResultHint:'填写参数并上传 Excel 后点击「开始求解」',
+ legendPallet:'木托盘', legendBare:'柜底裸地散箱',
+ replay:'▶ 播放装载顺序', stop:'■ 停止播放',
+ modeAll:'全部模式',
+},
+en:{
+ title:'Container Load Optimizer · Console',
+ subtitle:'Set options → upload data → solve → 3D preview → export the three deliverables (with validation gates)',
+ langLabel:'Language',
+ secInput:'① Input data',
+ excelLabel:'Excel data file (one sheet = one batch)',
+ tplHint:'Use the bundled <code>assets/输入模板.xlsx</code> template, or generate one with <code>scripts/make_template.py</code>.',
+ dlTpl:'Download blank template',
+ secBox:'② Container & pallet',
+ boxSpec:'Container type',
+ palSpec:'Pallet type',
+ secMode:'③ Loading mode',
+ modePallet:'Pallet mode<span class="hint">Stack onto pallets — suits mechanical handling and unit-turnover</span>',
+ modeNoPallet:'No-pallet mode<span class="hint">Stack cartons directly into columns — forklift loads straight off</span>',
+ secCons:'④ Constraints',
+ cMono:'One SKU per pallet (hard)<span class="hint">Uncheck to allow mixed SKUs per layer — higher pallet fill and fewer containers, but Mixed SKU labels are required</span>',
+ cTop:'Allow flat-stacked boxes on pallet top<span class="hint">Uses leftover height above the top layer (soft constraint)</span>',
+ cDbl:'Allow double-stacked pallets<span class="hint">A pallet on top of a pallet. Hard constraint — affects forklift handling and receiving-area height</span>',
+ cReorder:'Enable layer reordering<span class="hint">Moves poorly supported layers higher (less load above → lower crush risk). Removes fully unsupported boxes but may cost one extra container</span>',
+ cSupport:'Enable vertical support check<span class="hint">Reports against the 75% advised by GB/T 16470; whether it blocks delivery depends on the policy above</span>',
+ cCog:'Enable CoG offset check<span class="hint">Lateral centre-of-gravity offset ≤ 15% of container width, prevents uneven loading</span>',
+ secGoal:'⑤ Objective',
+ gAuto:'Auto-optimize — fewest containers<span class="hint">Soft constraints may be relaxed to save containers (e.g. mixing, top stacking)</span>',
+ gStrict:'Strictly as configured<span class="hint">Hard constraints are never violated, even at the cost of more containers</span>',
+ cBoth:'Also solve the other loading mode<span class="hint">Computes both pallet and no-pallet plans; switch between them with the Mode dropdown in the 3D view</span>',
+ secGate:'Validation report',
+ secTable:'Per-container detail',
+ optNone:'No limit',
+ tihi1:'1 layer — load height ≤1800mm', tihi2:'2 layers — load height ≤1200mm',
+ tihi3:'3 layers — load height ≤800mm', tihi4:'4 layers — load height ≤600mm',
+ spBalanced:'Balanced — repair clearly under-supported layers (recommended)',
+ spRelaxed:'Relaxed — only fix fully unsupported boxes; the rest are flagged for stretch wrap / strapping (fewest containers)',
+ spStrict:'Strict — support ratio is a hard constraint, never relaxed (most containers, slowest)',
+ nMaxh:'Goods above the receiving-area / rack height will be rejected. Leave blank for no limit.',
+ nMaxw:'Amazon FBA limits a pallet to 500kg gross weight.',
+ nMaxc:'When the container count exceeds this limit, the last container is dissolved and its cartons are moved into the bare floor space of the first N containers (holds the limit without adding a container). <b>Set 7 to cap every batch at ≤7 containers</b>. Leave blank for no limit.',
+ btnSolve:'Solve', btnExport:'Export deliverables',
+ nGate:'Validation runs in four layers: <b>L1 geometry</b> (out-of-bounds / overlap / layer height / door height) · <b>L2 stability & bearing</b> (support ratio / CoG / weight / stack layers) · <b>L3 three-way consistency</b> (plan ↔ xlsx ↔ 3D) · <b>L4 visual review</b> (screenshot + human/agent inspection). Any L1/L2/L3 error blocks delivery.',
+ allModes:'All modes',
+ allBatches:'All batches',
+ btnPrev:'◀ Previous', btnNext:'Next ▶',
+ btnReset:'Reset view', btnWire:'Wireframe',
+ statContainers:'Containers', statCartons:'Cartons', statCbm:'CBM',
+ statValidation:'L1+L2 validation', statWarn:'Warnings', statElapsed:'Elapsed',
+ batchLabel:'Batch', modeLabel:'Mode',
+ thContainer:'Ctr', thBatch:'Batch', thCartons:'Cartons', thCbm:'CBM',
+ thUtil:'Utilization', thPallets:'Pallets', thTop:'Top height', thSku:'SKU mix',
+ gateOk:'✓ All L1 geometry / L2 stability checks passed — the plan is deliverable.',
+ gateBad:'✗ <b>{n}</b> error(s) found; delivery is <b>blocked by policy</b>. Review the details below and fix the input or constraints.',
+ gateWarn:'! {n} warning(s) — do not block delivery, but note them in the plan.',
+ consTitle:'Constraints in effect for this run:',
+ solving:'Solving and validating, please wait…',
+ solved:'Solved: {c} container(s) / {n} carton(s) / {t}s',
+ solveFail:'Solve failed: {e}',
+ needFile:'Please choose an Excel data file first',
+ reqFail:'Request failed: {e}',
+ exported:'Exported: {f} + {z}',
+ exportFail:'Export failed: {e}',
+ noResult:'No result yet',
+ noResultHint:'Set the options, upload an Excel file, then click Solve',
+ legendPallet:'Wooden pallet', legendBare:'Bare-floor cartons',
+ replay:'▶ Play loading sequence', stop:'■ Stop',
+ modeAll:'All modes',
+}};
+let LANG='zh';
+function t(key,vars){
+  const src=(I18N[LANG]&&I18N[LANG][key])||(I18N.zh[key])||key;
+  return vars?src.replace(/\{(\w+)\}/g,(m,k)=>vars[k]!==undefined?vars[k]:m):src;
+}
+function applyLang(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const v=t(el.getAttribute('data-i18n'));
+    if(v!==el.innerHTML) el.innerHTML=v;
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{
+    el.placeholder=t(el.getAttribute('data-i18n-ph'));
+  });
+  document.documentElement.lang=(LANG==='zh'?'zh-CN':'en');
+  try{localStorage.setItem('clolang',LANG);}catch(e){}
+  // 规格显示名随语言变化 → 重新拉取 catalog 并刷新下拉
+  if(typeof loadCatalog==='function') loadCatalog();
+  if(typeof renderResult==='function'&&LAST) renderResult(LAST);
+  if(typeof syncBatchSel==='function') syncBatchSel();
+  if(typeof draw==='function') draw();
+}
+
+// 拉取柜型/托盘规格并填充下拉 (显示名随语言变化, 故可重复调用)
+async function loadCatalog(){
+  CAT=await (await fetch('/api/catalog')).json();
+  const cs=$('container');
+  const keepBox=cs.value||CAT.defaults.container;
+  cs.innerHTML='';
+  CAT.containers.forEach(c=>{const o=document.createElement('option');
+    o.value=c.code;o.textContent=c.label;cs.appendChild(o);});
+  cs.value=keepBox;
+  const ps=$('pallet');
+  const keepPal=ps.value||CAT.defaults.pallet;
+  ps.innerHTML='';
+  CAT.pallets.forEach(p=>{const o=document.createElement('option');
+    o.value=p.code;o.textContent=p.label;ps.appendChild(o);});
+  ps.value=keepPal;
+  if(typeof updBox==='function') updBox();
+  if(typeof updPal==='function') updPal();
+}
+
+let CAT=null, SCENES=null, PALCOL={}, box=null, bi='__', mi='__', ci=0;
+let yaw=1.05,pitch=0.42,zoom=1,panX=0,panY=0,camDist=1.25,focal=6400;
+let drag=false,lx=0,ly=0,wire=false,playing=false,playT=0,LAST=null;
+const $=id=>document.getElementById(id);
+
+function toast(msg,ms=2600){const l=$('log');l.textContent=msg;l.classList.add('show');
+ clearTimeout(l._t);l._t=setTimeout(()=>l.classList.remove('show'),ms);}
+
+async function init(){
+  // 语言: 优先 localStorage, 其次浏览器语言, 最后中文
+  try{const s=localStorage.getItem('clolang'); if(s) LANG=(s==='en'?'en':'zh');}catch(e){}
+  if(!localStorage.getItem){
+    const bl=(navigator.language||'zh').toLowerCase();
+    if(bl.startsWith('en')) LANG='en';
+  }
+  $('lang').value=LANG;
+  applyLang();
+  $('lang').onchange=e=>{LANG=e.target.value;applyLang();};
+
+  CAT=await (await fetch('/api/catalog')).json();
+  const cs=$('container'); cs.innerHTML='';
+  CAT.containers.forEach(c=>{const o=document.createElement('option');
+    o.value=c.code;o.textContent=c.label;cs.appendChild(o);});
+  cs.value=CAT.defaults.container;
+  const ps=$('pallet'); ps.innerHTML='';
+  CAT.pallets.forEach(p=>{const o=document.createElement('option');
+    o.value=p.code;o.textContent=p.label;ps.appendChild(o);});
+  ps.value=CAT.defaults.pallet;
+  updBox(); updPal();
+  cs.onchange=updBox; ps.onchange=updPal;
+  $('modeSel').querySelectorAll('label').forEach(l=>{
+    l.onclick=()=>{ $('modeSel').querySelectorAll('label').forEach(x=>x.classList.remove('on'));
+      l.classList.add('on'); syncMode(); };});
+  $('optSel').querySelectorAll('label').forEach(l=>{
+    l.onclick=()=>{ $('optSel').querySelectorAll('label').forEach(x=>x.classList.remove('on'));
+      l.classList.add('on'); };});
+  $('tmpl').onclick=()=>toast(LANG==='en'
+    ? 'Template: assets/输入模板.xlsx in the skill folder'
+    : '模板位于 skill 的 assets/输入模板.xlsx');
+  $('solve').onclick=solve; $('export').onclick=exportAll;
+  $('prev').onclick=()=>{const l=list();if(l.length)ci=(ci-1+l.length)%l.length;draw();};
+  $('next').onclick=()=>{const l=list();if(l.length)ci=(ci+1)%l.length;draw();};
+  $('reset').onclick=()=>{yaw=1.05;pitch=0.42;zoom=1;panX=0;panY=0;camDist=1.25;focal=6400;draw();};
+  $('wire').onclick=e=>{wire=!wire;e.target.classList.toggle('on',wire);draw();};
+  $('play').onclick=e=>{ if(playing){playing=false;e.target.textContent=t('replay');
+    e.target.classList.remove('on');return;}
+    playing=true;playT=0;e.target.textContent=t('stop');e.target.classList.add('on');
+    const step=()=>{if(!playing)return;playT=Math.min(1,playT+0.006);draw();
+      if(playT>=1){playing=false;$('play').textContent=t('replay');
+        $('play').classList.remove('on');return;} requestAnimationFrame(step);};
+    requestAnimationFrame(step);};
+  $('batch').onchange=e=>{bi=e.target.value;ci=0;draw();};
+  $('modeSel2').onchange=e=>{mi=e.target.value;ci=0;syncBatchSel();draw();};
+  resize(); draw();
+}
+
+function updBox(){
+  const c=CAT.containers.find(x=>x.code===$('container').value);
+  $('cdesc').textContent = LANG==='en'
+    ? `Internal ${c.L}×${c.W}×${c.H}mm · door opening ${c.doorH}mm · volume ${c.vol}m³ · payload ${c.payload}kg`
+    : `内空 ${c.L}×${c.W}×${c.H}mm · 门开口高 ${c.doorH}mm · 容积 ${c.vol}m³ · 载重 ${c.payload}kg`;
+}
+function updPal(){
+  const p=CAT.pallets.find(x=>x.code===$('pallet').value);
+  $('pdesc').textContent=`${p.L}×${p.W}×${p.H}mm · ${p.entry==='four-way'?(LANG==='en'?'four-way entry':'四向叉车'):(LANG==='en'?'two-way entry':'两向叉车')} · ${LANG==='en'?'rated load':'额定载重'} ${p.maxLoad}kg`;
+  $('customPal').style.display = (p.region==='CUSTOM')?'block':'none';
+}
+function syncMode(){
+  const m=document.querySelector('input[name=mode]:checked').value;
+  $('palletCons').style.display = (m==='pallet')?'block':'none';
+}
+
+function collect(){
+  const m=document.querySelector('input[name=mode]:checked').value;
+  const opt=document.querySelector('input[name=opt]:checked').value;
+  const tihi=$('tihi').value;
+  const maxh=$('maxh').value.trim(), maxw=$('maxw').value.trim();
+  const cfg={
+    container:$('container').value, pallet:$('pallet').value,
+    solve_both: $('both').checked,
+    lang: LANG,
+    constraints:{
+      mode: m==='pallet'?'pallet':'nopallet',
+      mono_sku:$('mono').checked, allow_top:$('top').checked,
+      allow_double_pallet:$('dbl').checked,
+      tihi_layers: tihi?parseInt(tihi):null,
+      max_pallet_stack_h: maxh?parseFloat(maxh):null,
+      max_pallet_weight: maxw?parseFloat(maxw):null,
+      min_support_ratio: null,
+      support_policy: $('supportPolicy').value,
+      reorder_layers: $('reorder').checked,
+      max_cog_offset: $('cog').checked?0.15:null,
+      optimize: opt,
+      max_containers: (function(){const v=$('maxc').value.trim();return v?parseInt(v):null;})(),
+      restarts: parseInt($('restarts').value)||10,
+    }};
+  const p=CAT.pallets.find(x=>x.code===$('pallet').value);
+  if(p.region==='CUSTOM') cfg.custom_pallet={L:parseFloat($('cpl').value),
+    W:parseFloat($('cpw').value),H:parseFloat($('cph').value)};
+  return cfg;
+}
+
+async function solve(){
+  const f=$('file').files[0];
+  if(!f){toast(t('needFile'));return;}
+  $('solve').disabled=true; $('solve').textContent=LANG==='en'?'Solving…':'求解中…';
+  $('status').textContent=t('solving');
+  try{
+    const fd=new FormData();
+    fd.append('file',f);
+    fd.append('config',JSON.stringify(collect()));
+    const r=await fetch('/api/solve',{method:'POST',body:fd});
+    const j=await r.json();
+    if(!j.ok){ toast(t('solveFail',{e:j.error}),6000);
+      $('status').textContent=LANG==='en'?'Solve failed':'求解失败'; return; }
+    LAST=j; SCENES=j.scenes; box=SCENES.ct;
+    renderResult(j);
+    toast(t('solved',{c:j.containers,n:j.cartons,t:j.elapsed}));
+  }catch(e){ toast(t('reqFail',{e:e.message}),6000); }
+  finally{ $('solve').disabled=false; $('solve').textContent=t('btnSolve'); }
+}
+
+function renderResult(j){
+  $('export').disabled = !(j.validation && j.validation.passed);
+  const v=j.validation||{};
+  const passedTxt = LANG==='en' ? (v.passed?'Passed':'Failed') : (v.passed?'通过':'失败');
+  $('stats').innerHTML=`
+    <div class="stat"><div class="n">${j.containers}</div><div class="l">${t('statContainers')}</div></div>
+    <div class="stat"><div class="n">${j.cartons}</div><div class="l">${t('statCartons')}</div></div>
+    <div class="stat"><div class="n">${j.cbm}</div><div class="l">${t('statCbm')}</div></div>
+    <div class="stat ${v.passed?'ok':'bad'}"><div class="n">${passedTxt}</div><div class="l">${t('statValidation')}</div></div>
+    <div class="stat ${v.warns?'warn':''}"><div class="n">${v.warns||0}</div><div class="l">${t('statWarn')}</div></div>
+    <div class="stat"><div class="n">${j.elapsed}s</div><div class="l">${t('statElapsed')}</div></div>`;
+
+  // 模式下拉 (数据驱动: 一次算出几套方案就有几个选项)
+  const ms=SCENES.modes||[];
+  $('modeSel2').innerHTML=`<option value="__">${t('allModes')}</option>`+
+    ms.map(m=>`<option value="${m.code}">${m.label}</option>`).join('');
+  mi='__';
+  syncBatchSel();
+  ci=0;
+
+  // 校验报告
+  let g='';
+  if(v.passed) g+=`<div class="ok-box">${t('gateOk')}</div>`;
+  else g+=`<div class="bad-box">${t('gateBad',{n:v.errors||0})}</div>`;
+  if(v.warns) g+=`<div class="warn-box">${t('gateWarn',{n:v.warns})}</div>`;
+  const checks=v.checks||[];
+  if(checks.length){
+    g+=`<table class="t"><thead><tr><th>${LANG==='en'?'Layer':'层'}</th><th>${LANG==='en'?'Level':'级别'}</th><th>${LANG==='en'?'Code':'代码'}</th><th>${LANG==='en'?'Detail':'说明'}</th></tr></thead><tbody>`;
+    checks.forEach(c=>{const bg=c.level==='error'?'#fef2f2':(c.level==='warn'?'#fffbeb':'');
+      g+=`<tr style="background:${bg}"><td>${c.layer}</td><td>${c.level}</td><td>${c.code}</td><td>${c.msg}</td></tr>`;});
+    g+='</tbody></table>';
+  }
+  if(j.constraints && j.constraints.length){
+    g+=`<div class="note"><b>${t('consTitle')}</b><br>`+j.constraints.map(c=>'· '+c).join('<br>')+'</div>';
+  }
+  $('gate').innerHTML=g;
+
+  // 明细表 (含模式列, 两方案合并时按模式分组)
+  const tb=$('tbl').querySelector('tbody'); tb.innerHTML='';
+  SCENES.items.forEach(s=>{
+    const sk={}; s.boxes.forEach(b=>{if(b.sku)sk[b.sku]=(sk[b.sku]||0)+1;});
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${s.local_idx||s.idx}</td><td>${s.mode_label||''}</td><td>${s.batch||''}</td><td>${s.cartons}</td><td>${s.cbm}</td>
+      <td>${s.util}%</td><td>${s.npallets}</td><td>${s.hmax}</td><td>`+
+      Object.entries(sk).map(([k,n])=>`${k}×${n}`).join(' ')+'</td>';
+    tr.onclick=()=>{mi=s.mode;bi=s.batch;
+      $('modeSel2').value=mi; syncBatchSel(); $('batch').value=bi;
+      ci=list().indexOf(s); if(ci<0) ci=0; draw();};
+    tb.appendChild(tr);
+  });
+
+  // 图例
+  const seen={};
+  SCENES.items.forEach(s=>s.boxes.forEach(b=>{if(b.sku)seen[b.sku]=b.c;}));
+  $('legend').innerHTML=Object.entries(seen).map(([k,c])=>
+    `<span><i style="background:${c}"></i>${k}</span>`).join('')+
+    `<span><i style="background:#b45309"></i>${t('legendPallet')}</span>`;
+  draw();
+}
+
+async function exportAll(){
+  $('export').disabled=true;
+  try{
+    const r=await fetch('/api/export',{method:'POST',body:JSON.stringify({})});
+    const j=await r.json();
+    if(!j.ok){toast(t('exportFail',{e:j.error}));return;}
+    const a=document.createElement('a');
+    a.href='/api/download/'+encodeURIComponent(j.zip);a.click();
+    toast(t('exported',{f:Object.values(j.files).join(', '),z:j.zip}),5000);
+  }finally{ $('export').disabled=false; }
+}
+
+// ---------- 3D 渲染 ----------
+function list(){return SCENES?SCENES.items.filter(s=>(mi==='__'||s.mode===mi)&&(bi==='__'||s.batch===bi)):[];}
+// 批次下拉按当前模式过滤后重建 (两方案的批次集合可能不同)
+function syncBatchSel(){
+  const bs=[...new Set((SCENES?SCENES.items:[]).filter(s=>mi==='__'||s.mode===mi).map(s=>s.batch))];
+  const sel=$('batch');
+  sel.innerHTML=`<option value="__">${t('allBatches')}</option>`+
+    bs.map(b=>`<option value="${b}">${b}</option>`).join('');
+  if(!bs.includes(bi)) bi='__';
+  sel.value=bi;
+}
+function cur(){const l=list();return l[ci]||l[0];}
+function resize(){const r=$('cv').getBoundingClientRect(),d=window.devicePixelRatio||1;
+ $('cv').width=Math.round(r.width*d);$('cv').height=Math.round(r.height*d);
+ const ctx=$('cv').getContext('2d');ctx.setTransform(d,0,0,d,0,0);}
+window.addEventListener('resize',resize);
+$('cv').addEventListener('mousedown',e=>{drag=true;lx=e.clientX;ly=e.clientY;});
+window.addEventListener('mouseup',()=>drag=false);
+window.addEventListener('mousemove',e=>{if(!drag)return;
+ const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;
+ if(e.shiftKey){panX+=dx;panY+=dy;}
+ else{yaw+=dx*0.006;pitch+=dy*0.005;pitch=Math.max(-0.3,Math.min(1.35,pitch));}
+ draw();});
+$('cv').addEventListener('wheel',e=>{e.preventDefault();
+ camDist*=(e.deltaY>0?1.08:0.93);camDist=Math.max(0.9,Math.min(6,camDist));draw();},{passive:false});
+
+function draw(){
+ const cv=$('cv'),ctx=cv.getContext('2d'),W=cv.clientWidth,H=cv.clientHeight;
+ ctx.fillStyle='#f8fafc';ctx.fillRect(0,0,W,H);
+ if(!SCENES||!box||!cur()){ $('hud').innerHTML=`<b>${t('noResult')}</b><br><span class="k">${t('noResultHint')}</span>`; return;}
+ const C=box,c=cur();
+ const cy=Math.cos(yaw),sy=Math.sin(yaw),cx=Math.cos(pitch),sx=Math.sin(pitch);
+ const ox=W/2+panX,oy=H/2+panY,CAM_D=22000*camDist;
+ function depthH(x,y){const a=x-C.L/2,b=y-C.W/2;return (a*sy+b*cy)*cx+CAM_D;}
+ function cam3(x,y,z){const a=x-C.L/2,b=y-C.W/2,cc=z-C.H/2;
+  const rx=a*cy-b*sy,ry=a*sy+b*cy,rz=cc;
+  const ey=ry*cx-rz*sx,ez=ry*sx+rz*cx;
+  const depth=ey+CAM_D,p=focal/Math.max(depth,1500);return [rx*p,-ez*p,depth];}
+ const probe=[];
+ for(const cx0 of [0,C.L])for(const cy0 of [0,C.W])probe.push(cam3(cx0,cy0,0));
+ for(const b of (c.boxes||[]))for(const d of [[0,0,0],[b.w,0,0],[b.w,b.d,0],[0,b.d,0],
+   [0,0,b.h],[b.w,0,b.h],[b.w,b.d,b.h],[0,b.d,b.h]])probe.push(cam3(b.x+d[0],b.y+d[1],b.z+d[2]));
+ let mnX=1e18,mxX=-1e18,mnY=1e18,mxY=-1e18;
+ for(const p of probe){if(p[0]<mnX)mnX=p[0];if(p[0]>mxX)mxX=p[0];
+  if(p[1]<mnY)mnY=p[1];if(p[1]>mxY)mxY=p[1];}
+ const S=Math.min((W-50)/Math.max(mxX-mnX,1),(H-50)/Math.max(mxY-mnY,1))*0.98*zoom;
+ const mx=(mnX+mxX)/2,my=(mnY+mxY)/2;
+ function V(x,y,z){const p=cam3(x,y,z);return [ox+(p[0]-mx)*S,oy+(p[1]-my)*S,p[2]];}
+ ctx.beginPath();ctx.moveTo(...V(0,0,0));ctx.lineTo(...V(C.L,0,0));
+ ctx.lineTo(...V(C.L,C.W,0));ctx.lineTo(...V(0,C.W,0));ctx.closePath();
+ ctx.fillStyle='#e2e8f0';ctx.fill();ctx.strokeStyle='#0f172a';ctx.lineWidth=1.6;ctx.stroke();
+ let boxes=(c.boxes||[]).slice();
+ if(playing)boxes=boxes.slice(0,Math.max(1,Math.floor(boxes.length*playT)));
+ const B=boxes.map(b=>({...b,depth:depthH(b.x+b.w/2,b.y+b.d/2)}));
+ B.sort((p,q)=>q.depth-p.depth);
+ for(const b of B){
+  const x0=b.x,x1=b.x+b.w,y0=b.y,y1=b.y+b.d,z0=b.z,z1=b.z+b.h,pal=b.kind==='pallet';
+  ctx.beginPath();ctx.moveTo(...V(x1,y0,z0));ctx.lineTo(...V(x1,y1,z0));
+  ctx.lineTo(...V(x1,y1,z1));ctx.lineTo(...V(x1,y0,z1));ctx.closePath();
+  ctx.fillStyle=b.c;ctx.globalAlpha=wire?0.05:(pal?0.30:0.32);ctx.fill();ctx.globalAlpha=1;
+  ctx.strokeStyle='rgba(15,23,42,.28)';ctx.lineWidth=0.3;ctx.stroke();
+  ctx.beginPath();ctx.moveTo(...V(x0,y0,z0));ctx.lineTo(...V(x1,y0,z0));
+  ctx.lineTo(...V(x1,y0,z1));ctx.lineTo(...V(x0,y0,z1));ctx.closePath();
+  ctx.fillStyle=b.c;ctx.globalAlpha=wire?0.06:(pal?0.42:0.45);ctx.fill();ctx.globalAlpha=1;
+  ctx.strokeStyle='rgba(15,23,42,.35)';ctx.lineWidth=0.3;ctx.stroke();
+  ctx.beginPath();ctx.moveTo(...V(x0,y0,z1));ctx.lineTo(...V(x1,y0,z1));
+  ctx.lineTo(...V(x1,y1,z1));ctx.lineTo(...V(x0,y1,z1));ctx.closePath();
+  ctx.fillStyle=b.c;ctx.globalAlpha=wire?0.12:(pal?0.62:0.68);ctx.fill();ctx.globalAlpha=1;
+  ctx.strokeStyle='rgba(15,23,42,.5)';ctx.lineWidth=0.4;ctx.stroke();
+ }
+ ctx.strokeStyle='#0f172a';ctx.lineWidth=1.6;
+ for(const e of [[0,0,C.H],[C.L,0,C.H],[C.L,C.W,C.H],[0,C.W,C.H],[0,0,0],[0,0,C.H],
+   [C.L,0,0],[C.L,0,C.H],[C.L,C.W,0],[C.L,C.W,C.H],[0,C.W,0],[0,C.W,C.H]]){
+  ctx.beginPath();ctx.moveTo(...V(e[0],e[1],e[2]));ctx.lineTo(...V(e[3],e[4],e[5]));ctx.stroke();}
+ const dl=V(0,0,C.doorH),dr=V(0,C.W,C.doorH);
+ ctx.save();ctx.strokeStyle='#dc2626';ctx.lineWidth=2.8;ctx.setLineDash([8,4]);
+ ctx.beginPath();ctx.moveTo(dl[0],dl[1]);ctx.lineTo(dr[0],dr[1]);ctx.stroke();ctx.restore();
+ ctx.fillStyle='#dc2626';ctx.font='600 12.5px sans-serif';
+ ctx.fillText((LANG==='en'?'Door opening height ':'门开口高 ')+C.doorH+'mm',dl[0]-6,dl[1]-9);
+ const dmid=V(0,C.W/2,0);ctx.fillStyle='#334155';ctx.font='600 11.5px sans-serif';
+ ctx.fillText(LANG==='en'?'◀ Door end':'◀ 柜门端',dmid[0]-46,dmid[1]+16);
+ const ctrWord = LANG==='en'?'Ctr ':'柜';
+ $('hud').innerHTML=`<b>${c.mode_label||''} · ${c.batch||''} · ${C.label} · ${ctrWord}${c.local_idx||c.idx} / ${list().length}</b><br>`+
+  `<span class="k">${LANG==='en'?'Cartons':'纸箱'}</span> <b>${c.cartons}</b> &nbsp;<span class="k">${LANG==='en'?'Volume':'货量'}</span> <b>${c.cbm}</b> m³<br>`+
+  `<span class="k">${t('thUtil')}</span> <b>${c.util}%</b> &nbsp;<span class="k">${LANG==='en'?'Top height':'顶高'}</span> <b>${c.hmax}</b> mm<br>`+
+  `<span class="k">${t('thPallets')}</span> <b>${c.npallets||0}</b>`;
+}
+init();
+</script>
+</body>
+</html>
