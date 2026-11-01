@@ -5,6 +5,13 @@
 
 用法:
     python scripts/push_via_api.py <本地目录> <owner/repo> [branch] [--message MSG]
+
+代理:
+    默认直连。若需要走代理, 按以下优先级设置环境变量:
+      GH_PROXY        (专用, 优先级最高)
+      HTTPS_PROXY / https_proxy
+      HTTP_PROXY  / http_proxy
+    例: export GH_PROXY=http://127.0.0.1:7890
 """
 import base64
 import json
@@ -16,25 +23,54 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-PROXY = os.environ.get("GH_PROXY", "http://127.0.0.1:10801")
+
+def _resolve_proxy():
+    """解析代理设置: GH_PROXY > 标准代理环境变量 > 直连 (空字符串)。
+
+    默认不设代理 —— 通用环境下的合理默认; 需要代理时用环境变量指定。
+    """
+    for key in ("GH_PROXY", "HTTPS_PROXY", "https_proxy",
+                "HTTP_PROXY", "http_proxy"):
+        val = os.environ.get(key, "").strip()
+        if val:
+            return val
+    return ""
+
+
+PROXY = _resolve_proxy()
 API = "https://api.github.com"
 
 
 def get_token():
-    """从 ~/.git-credentials 读取 PAT (不打印明文)。"""
+    """读取 GitHub PAT。
+
+    优先级:
+      1. 环境变量 GITHUB_TOKEN / GH_TOKEN
+      2. ~/.git-credentials (git credential store 写入的格式)
+    返回值不会打印到 stdout。
+    """
+    for key in ("GITHUB_TOKEN", "GH_TOKEN"):
+        val = os.environ.get(key, "").strip()
+        if val:
+            return val
+
     path = os.path.expanduser("~/.git-credentials")
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            m = re.match(r"https://([^:]+):([^@]+)@(.+)", line)
-            if m and m.group(3).startswith("github.com"):
-                return m.group(2)
-    raise SystemExit("找不到 GitHub PAT (检查 ~/.git-credentials)")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                m = re.match(r"https://([^:]+):([^@]+)@(.+)", line)
+                if m and m.group(3).startswith("github.com"):
+                    return m.group(2)
+    raise SystemExit(
+        "找不到 GitHub PAT。请设置环境变量 GITHUB_TOKEN, "
+        "或用 `git credential-store` 写入 ~/.git-credentials。")
 
 
 TOKEN = get_token()
+# 空 ProxyHandler 表示显式直连, 不让 urllib 再自行探测环境变量
 OPENER = urllib.request.build_opener(
-    urllib.request.ProxyHandler({"http": PROXY, "https": PROXY}))
+    urllib.request.ProxyHandler({"http": PROXY, "https": PROXY} if PROXY else {}))
 
 
 def api(method, path, body=None, raw=False):
