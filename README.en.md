@@ -206,16 +206,33 @@ node scripts/visual_check.mjs out/loading_3d.html shots/
 
 Excel, **one working sheet = one batch**. The parser recognises header rows within the first 1–8 rows by keyword.
 
-| Column | Required | Notes |
-|---|---|---|
-| SKU code | ✅ | |
-| Length / Width / Height (mm) | ✅ | **Must be millimetres** — the parser does no unit conversion |
-| Cartons | ✅ | |
-| Description | | |
-| Pieces per carton | | |
-| Gross weight per carton (kg) | | Needed for bearing and CoG checks |
-| Edge crush test (kN/m) | | Default 6.0; used with the Kellicutt formula to derive stack limits |
-| Max stack layers | | Derived automatically from ECT + environmental derating + safety factor 3 when blank |
+**All quantities and dimensions are expressed in terms of the shipping carton (outer box).**
+
+| Column | Unit | Required | Notes |
+|---|---|---|---|
+| SKU code | — | ✅ | |
+| Description | — | | |
+| Carton length / width / height (mm) | mm | ✅ | External dimensions of one carton — **must be millimetres**, the parser does no unit conversion |
+| Cartons (outer) | boxes | ✅ | How many such cartons are needed |
+| Pieces per carton | pcs/carton | | How many **individual products** fit in one carton. Not used in the packing computation — only printed on the job card |
+| Gross weight per carton (kg) | kg/carton | | **Whole-carton gross weight** = all products inside + the carton packaging. Required for bearing and CoG checks |
+| Edge crush test (kN/m) | kN/m | | Default 6.0; used with the Kellicutt formula to derive stack limits |
+| Max stack layers | layers | | Derived automatically from ECT + environmental derating + safety factor 3 when blank |
+
+**The three easily-confused fields**:
+
+```
+Pieces per carton = how many individual products fit inside one carton   (e.g. 12)
+Gross weight per carton = the whole-carton weight (all products + packaging)
+Cartons = how many such cartons you need
+
+Conversion:  total individual products = Cartons × Pieces per carton
+             total gross weight (kg)     = Cartons × Gross weight per carton
+```
+
+> If you only have the net weight of a single product, add the packaging yourself and
+> enter the **whole-carton** weight — bearing checks use it directly, so entering a
+> per-piece weight underestimates the total container weight by dozens of times.
 
 ---
 
