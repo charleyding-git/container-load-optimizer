@@ -214,8 +214,16 @@ function draw(){
   ctx.strokeStyle='rgba(15,23,42,.5)';ctx.lineWidth=0.4;ctx.stroke();
  }
  ctx.strokeStyle='#0f172a';ctx.lineWidth=1.6;
- for(const e of [[0,0,C.H],[C.L,0,C.H],[C.L,C.W,C.H],[0,C.W,C.H],[0,0,0],[0,0,C.H],
-   [C.L,0,0],[C.L,0,C.H],[C.L,C.W,0],[C.L,C.W,C.H],[0,C.W,0],[0,C.W,C.H]]){
+ // 柜体 12 条棱: 每项 6 个数 = 起点(x,y,z) + 终点(x,y,z)
+ // (历史上这里写成 3 个数一个点, 但下面按 e[3..5] 取终点 → 全是 undefined,
+ //  导致 NaN 坐标, 12 条棱一条都画不出来 —— 只剩底面多边形那条线)
+ for(const e of [
+   [0,0,0,    C.L,0,0],     [0,C.W,0,   C.L,C.W,0],   // 底面 x 向 2 条
+   [0,0,C.H,  C.L,0,C.H],   [0,C.W,C.H, C.L,C.W,C.H], // 顶面 x 向 2 条
+   [0,0,0,    0,0,C.H],     [C.L,0,0,   C.L,0,C.H],   // y=0 面 z 向 2 条
+   [0,C.W,0,  0,C.W,C.H],   [C.L,C.W,0, C.L,C.W,C.H], // y=W 面 z 向 2 条
+   [0,0,0,    0,C.W,0],     [C.L,0,0,   C.L,C.W,0],   // 底面 y 向 2 条
+   [0,0,C.H,  0,C.W,C.H],   [C.L,0,C.H, C.L,C.W,C.H]]){// 顶面 y 向 2 条
   ctx.beginPath();ctx.moveTo(...V(e[0],e[1],e[2]));ctx.lineTo(...V(e[3],e[4],e[5]));ctx.stroke();}
  const dl=V(0,0,C.doorH),dr=V(0,C.W,C.doorH);
  ctx.save();ctx.strokeStyle='#dc2626';ctx.lineWidth=2.8;ctx.setLineDash([8,4]);
