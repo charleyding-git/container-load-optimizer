@@ -93,16 +93,23 @@ A language switch lives in the header (Chinese / English); the choice is remembe
 
 Excel, **each working sheet = one batch** (shipped together). The parser finds the header row within the first 1–8 rows and matches columns by keyword.
 
-| Column | Required | Notes |
-|---|---|---|
-| SKU code | ✅ | |
-| Length / Width / Height (mm) | ✅ | **Must be millimetres** — the parser does no unit conversion |
-| Cartons | ✅ | |
-| Description | | |
-| Pieces per carton | | |
-| Gross weight per carton (kg) | | Required for bearing and CoG checks |
-| Edge crush test ECT (kN/m) | | Default 6.0; used with the Kellicutt formula to derive stack limits |
-| Max stack layers | | Derived from ECT + environmental derating + safety factor 3 when blank |
+**All quantities and dimensions are expressed in terms of the shipping carton (outer box).**
+
+| Column | Unit | Required | Notes |
+|---|---|---|---|
+| SKU code | — | ✅ | |
+| Description | — | | |
+| Carton length / width / height (mm) | mm | ✅ | External dimensions of one carton — **must be millimetres**, the parser does no unit conversion |
+| Cartons (outer) | boxes | ✅ | How many such cartons are needed |
+| Pieces per carton | pcs/carton | | How many **individual products** fit in one carton. Not used in the packing computation — only printed on the job card |
+| Gross weight per carton (kg) | kg/carton | | **Whole-carton gross weight** = all products inside + the carton packaging. Required for bearing and CoG checks |
+| Edge crush test ECT (kN/m) | kN/m | | Default 6.0; used with the Kellicutt formula to derive stack limits |
+| Max stack layers | layers | | Derived from ECT + environmental derating + safety factor 3 when blank |
+
+**The three easily-confused fields**: `total individual products = Cartons × Pieces per carton`;
+`total gross weight = Cartons × Gross weight per carton`.
+If the user only has a per-piece net weight, it must be converted to a whole-carton weight
+first — otherwise the container total weight is underestimated by dozens of times.
 
 ## Four validation layers
 
