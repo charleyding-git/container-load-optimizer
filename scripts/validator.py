@@ -770,6 +770,20 @@ def check_consistency(plan, xlsx_rows, viz_scenes, gate: Gate):
                                container=pr[0], field=["cartons", "cbm", "util", "pallets"][i],
                                plan_value=pn, xlsx_value=xn)
     # --- plan ↔ 3D 渲染
+    # 合并模式的 3D 页面含【两种模式】的 scene (mode=A 无托盘 / mode=B 有托盘),
+    # 而 plan 只有一种模式 → 必须先按模式过滤, 否则会拿别的模式的 scene 来比,
+    # 造成"箱数翻倍"的假不一致。
+    _modes = {s.get("mode") for s in viz_scenes if s.get("mode")}
+    if len(_modes) > 1:
+        # plan 的柜号落在哪种模式上, 用 local_idx/idx 区间判断太脆;
+        # 改用: 取 scene 里 cartons 总量与 plan 最接近的那组模式。
+        _plan_total = sum(c["cartons"] for c in plan["containers"])
+        _by_mode = defaultdict(int)
+        for s in viz_scenes:
+            _by_mode[s.get("mode")] += s.get("cartons", 0)
+        _pick = min(_by_mode.items(), key=lambda kv: abs(kv[1] - _plan_total))[0]
+        viz_scenes = [s for s in viz_scenes if s.get("mode") == _pick]
+
     vmap = {s["idx"]: s for s in viz_scenes}
     for c in plan["containers"]:
         vs = vmap.get(c["idx"])
