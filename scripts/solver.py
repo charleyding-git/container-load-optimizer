@@ -159,11 +159,18 @@ def _build_with_top(main, skus, remain, pool, Hlim, rnd, cons,
                 continue
             break
         cands.sort(key=lambda t: (-t[0], -t[1]))
+        # ---- 连续性偏好: 上一层用过的 SKU 优先延续, 让同 SKU 的层相邻
+        # (不改变选中的 SKU/层高/箱数, 只改变"同等条件下"的先后次序)
+        if cur is not None:
+            cands.sort(key=lambda t: (t[2] != cur, -t[0], -t[1]))
         if rnd.random() < 0.22:
             for _ in range(max(1, len(cands) // 6)):
                 i = rnd.randrange(len(cands))
                 j = rnd.randrange(len(cands))
                 cands[i], cands[j] = cands[j], cands[i]
+            # 随机打乱后重新施加连续性偏好 (否则随机会把同 SKU 拆开)
+            if cur is not None:
+                cands.sort(key=lambda t: (t[2] != cur, -t[0], -t[1]))
         _, cpl, code, vz, lab, fx, fy, alay = cands[0]
         n = min(cpl, rem.get(code, 0))
         if n <= 0:
@@ -205,7 +212,13 @@ def _build_with_top(main, skus, remain, pool, Hlim, rnd, cons,
         top.append(t)
     if top_h > 0:
         mr = MaxRects(pal_L, pal_W)
-        for (code, lh, f1, f2) in lay_opts:
+        # 连续性: 主体层已有的 SKU 优先进平躺区 (让同 SKU 的平躺箱紧邻其主体层),
+        # 其余 SKU 按立高升序补位 —— 不改变平躺区的箱数与体积, 只改变 SKU 顺序。
+        body_skus = set(l["sku"] for l in layers)
+        lay_opts_sorted = sorted(
+            lay_opts,
+            key=lambda t: (0 if t[0] in body_skus else 1, t[1]))
+        for (code, lh, f1, f2) in lay_opts_sorted:
             if rem.get(code, 0) <= 0:
                 continue
             if cons.mono_sku and code != main:
