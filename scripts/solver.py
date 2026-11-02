@@ -74,8 +74,13 @@ def _layer_support_ok(prev_cells, new_cells, min_ratio, smap=None):
 
 
 def _build_with_top(main, skus, remain, pool, Hlim, rnd, cons,
-                    top_h, lay_opts, pal_L, pal_W):
-    """主体码垛 (上限 body_limit) + 顶部平躺区 (高 top_h)。"""
+                    top_h, lay_opts, pal_L, pal_W, prefer_skus=None):
+    """主体码垛 (上限 body_limit) + 顶部平躺区 (高 top_h)。
+
+    prefer_skus: 优先使用的 SKU (上一个托盘用过的补位 SKU)。
+        命中时优先选它 → 相邻托盘成分一致 → 同 SKU 在柜内集中成片。
+    """
+    pref = set(prefer_skus or ())
     rem = dict(remain)
     body_limit = Hlim - top_h
     layers = []
@@ -117,7 +122,10 @@ def _build_with_top(main, skus, remain, pool, Hlim, rnd, cons,
                     if used >= lim:
                         continue
                 bonus = 10000 if s.code == main else 0
-                raw.append((bonus + cpl, cpl, s.code, vz, lab, fx, fy))
+                # 补位偏好: 上一个托盘用过的 SKU 优先 (让相邻托盘成分一致,
+                # 同 SKU 在柜内集中成片, 而不是每个托盘掺不同 SKU)
+                pb = 5000 if (s.code in pref and s.code != main) else 0
+                raw.append((bonus + pb + cpl, cpl, s.code, vz, lab, fx, fy))
         if not raw:
             break
         raw.sort(key=lambda t: (-t[0], -t[1]))
@@ -131,14 +139,18 @@ def _build_with_top(main, skus, remain, pool, Hlim, rnd, cons,
             if not _lay:
                 continue
             if not prev_cells or min_sup <= 0:
-                cands.append(((10000 if code == main else 0) + cpl0, cpl0,
+                cands.append(((10000 if code == main else 0)
+                              + (5000 if (code in pref and code != main) else 0)
+                              + cpl0, cpl0,
                               code, vz, lab, fx, fy, None))
                 continue
             if smap is None:
                 smap = SupportMap(prev_cells)
             ok, _ = _layer_support_ok(prev_cells, list(_lay)[:cpl0], min_sup, smap)
             if ok:
-                cands.append(((10000 if code == main else 0) + cpl0, cpl0,
+                cands.append(((10000 if code == main else 0)
+                              + (5000 if (code in pref and code != main) else 0)
+                              + cpl0, cpl0,
                               code, vz, lab, fx, fy, None))
                 continue
             # 自由布局不达标 → 试探与下层对齐的布局 (受限预算)
@@ -149,7 +161,9 @@ def _build_with_top(main, skus, remain, pool, Hlim, rnd, cons,
                 prev_cells, fx, fy, pal_L, pal_W, min_sup)
             if an < 1:
                 continue
-            cands.append(((10000 if code == main else 0) + an, an,
+            cands.append(((10000 if code == main else 0)
+                          + (5000 if (code in pref and code != main) else 0)
+                          + an, an,
                           code, vz, lab, fx, fy, alay))
         if not cands:
             # 支撑约束太严 → 放宽重试, 避免无解
@@ -212,37 +226,52 @@ def _build_with_top(main, skus, remain, pool, Hlim, rnd, cons,
         top.append(t)
     if top_h > 0:
         mr = MaxRects(pal_L, pal_W)
-        # 连续性: 主体层已有的 SKU 优先进平躺区 (让同 SKU 的平躺箱紧邻其主体层),
-        # 其余 SKU 按立高升序补位 —— 不改变平躺区的箱数与体积, 只改变 SKU 顺序。
+        # ---- 顶部平躺区: 同一 SKU 要「成片」, 不能每个 SKU 各来 1 箱。
+        # 旧逻辑每个 SKU 只放一组就换下一个 → 柜顶出现「每色 1 个孤立单箱」,
+        # 视觉上到处是零散色块 (查理截图: "顶部有3个颜色单箱")。
+        # 新逻辑: 反复挑选「当前能放最多箱」的 SKU 放, 直到平躺区装满或都放不下。
+        #   → 同一个 SKU 的平躺箱集中在一处, 颜色成片。
         body_skus = set(l["sku"] for l in layers)
-        lay_opts_sorted = sorted(
-            lay_opts,
-            key=lambda t: (0 if t[0] in body_skus else 1, t[1]))
-        for (code, lh, f1, f2) in lay_opts_sorted:
-            if rem.get(code, 0) <= 0:
-                continue
-            if cons.mono_sku and code != main:
-                continue
-            if lh > top_h + 1e-6:
-                continue
-            foot = (f1, f2) if f1 <= f2 else (f2, f1)
-            placed = False
-            for (fw, fd) in (foot, (foot[1], foot[0])):
-                r = mr.place(fw, fd, "BSSF")
-                if not r:
+        # 候选顺序: 余量多的优先 (能一次装更多), 主体层已有的次之
+        def _cand_key(t):
+            code, lh = t[0], t[1]
+            return (-rem.get(code, 0),
+                    0 if code in body_skus else 1,
+                    lh)
+        lay_opts_sorted = sorted(lay_opts, key=_cand_key)
+        guard_top = 0
+        while guard_top < 40:
+            guard_top += 1
+            progressed = False
+            for (code, lh, f1, f2) in lay_opts_sorted:
+                if rem.get(code, 0) <= 0:
                     continue
-                n = min(rem.get(code, 0), int(top_h // lh))
-                if n < 1:
+                if cons.mono_sku and code != main:
                     continue
-                top.append(dict(sku=code, n=n, vz=lh,
-                                lab=f"平躺 {f1}x{f2}x{lh}",
-                                fx=fw, fy=fd, lay=True,
-                                cells=[(r[0], r[1], r[2], r[3])]))
-                rem[code] = rem.get(code, 0) - n
-                placed = True
+                if lh > top_h + 1e-6:
+                    continue
+                foot = (f1, f2) if f1 <= f2 else (f2, f1)
+                placed = False
+                for (fw, fd) in (foot, (foot[1], foot[0])):
+                    r = mr.place(fw, fd, "BSSF")
+                    if not r:
+                        continue
+                    n = min(rem.get(code, 0), int(top_h // lh))
+                    if n < 1:
+                        continue
+                    top.append(dict(sku=code, n=n, vz=lh,
+                                    lab=f"平躺 {f1}x{f2}x{lh}",
+                                    fx=fw, fy=fd, lay=True,
+                                    cells=[(r[0], r[1], r[2], r[3])]))
+                    rem[code] = rem.get(code, 0) - n
+                    placed = True
+                    progressed = True
+                    break
+                if placed:
+                    # 该 SKU 还有余量且平躺区还有空间 → 继续用它 (集中成片)
+                    break
+            if not progressed:
                 break
-            if placed:
-                continue
 
     cartons = sum(l["n"] for l in layers) + sum(t["n"] for t in top)
     vol = 0.0
@@ -258,7 +287,8 @@ def _build_with_top(main, skus, remain, pool, Hlim, rnd, cons,
                 skus=sorted(set([l["sku"] for l in layers] + [t["sku"] for t in top])))
 
 
-def _try_build(main, skus, remain, pool, Hlim, rnd, cons, pal_L, pal_W):
+def _try_build(main, skus, remain, pool, Hlim, rnd, cons, pal_L, pal_W,
+               prefer_skus=None):
     """尝试不同的顶部预留高度, 取最优。"""
     lay_opts = _lay_options(skus, remain, None, mono_main=main if cons.mono_sku else None)
     top_h_options = [0.0]
@@ -271,7 +301,8 @@ def _try_build(main, skus, remain, pool, Hlim, rnd, cons, pal_L, pal_W):
     best = None
     for top_h in top_h_options:
         plan = _build_with_top(main, skus, remain, pool, Hlim, rnd, cons,
-                               top_h, lay_opts, pal_L, pal_W)
+                               top_h, lay_opts, pal_L, pal_W,
+                               prefer_skus=prefer_skus)
         if plan is None:
             continue
         # 硬约束: 托盘货高不得超过可用高度 (门开口高 / TiHi / 限高)
@@ -294,13 +325,25 @@ def _try_build(main, skus, remain, pool, Hlim, rnd, cons, pal_L, pal_W):
     return best[1] if best else None
 
 
-def build_pallet(skus, remain, pool, Hlim, rnd, cons, pal_L, pal_W):
-    """构建一个托盘: 以主SKU贯穿, 其它SKU按层高互补插入。"""
-    cands = sorted([s.code for s in skus if remain.get(s.code, 0) > 0],
-                   key=lambda c: -remain[c])[:3]
+def build_pallet(skus, remain, pool, Hlim, rnd, cons, pal_L, pal_W,
+                  prefer_skus=None, main_force=None):
+    """构建一个托盘: 以主SKU贯穿, 其它SKU按层高互补插入。
+
+    prefer_skus: 优先使用的 SKU 集合 (来自上一个托盘)。
+        目的: 让相邻托盘用**同样的**补位 SKU → 同 SKU 在柜内集中成片,
+        而不是每个托盘掺不同的 SKU (那样同色会薄薄地撒满整柜, 视觉上到处都有)。
+    main_force: 强制指定主 SKU (调用方已决定轮换到谁)。非 None 时只用它当主角,
+        避免"余量最大的 SKU 霸占所有托盘位"。
+    """
+    live = [s.code for s in skus if remain.get(s.code, 0) > 0]
+    if main_force and main_force in live:
+        cands = [main_force]
+    else:
+        cands = sorted(live, key=lambda c: -remain[c])[:3]
     best = None
     for main in cands:
-        plan = _try_build(main, skus, remain, pool, Hlim, rnd, cons, pal_L, pal_W)
+        plan = _try_build(main, skus, remain, pool, Hlim, rnd, cons, pal_L, pal_W,
+                          prefer_skus=prefer_skus)
         if plan is None:
             continue
         key = (plan["cartons"], plan["cbm"])
@@ -1105,20 +1148,40 @@ def solve_pallet_mode(box_spec, skus, cons: Constraints, pal_spec):
                 round_bare.append((_c, _take))
                 remain[_c] -= _take
         pallets = []
+        # 主 SKU 轮换: 若始终用「余量最多的」SKU 当主角, 那个 SKU 会霸占所有
+        # 托盘位, 其余 SKU 只能当几箱的补位 → 同色薄片撒满整柜 (视觉上到处都有)。
+        # 让主角在「消耗到一定比例后」切换, 使每个 SKU 都有一整段连续的独占
+        # 托盘位 → 同 SKU 在柜内聚成一大片。
+        main = None
+        main_left = 0            # 当前主角的初始箱数 (用于算消耗比例)
+        main_done = 0            # 当前主角已消耗箱数
+        prefer_skus = None       # 补位偏好: 沿用上一个托盘用过的 SKU
         guard = 0
         while sum(remain.values()) > 0 and guard < 400:
             guard += 1
-            main = max(remain, key=lambda c: remain[c]) if remain else None
-            if main is None or remain[main] <= 0:
-                main = next((c for c in remain if remain[c] > 0), None)
-            if main is None:
+            live = [c for c in remain if remain[c] > 0]
+            if not live:
                 break
-            plan = build_pallet(skus, remain, pool, Hlim, rnd, cons, pal_L, pal_W)
+            # 主角已用掉 60% 或已耗尽 → 换下一个 (按余量从大到小)
+            if (main is None or remain.get(main, 0) <= 0
+                    or (main_left > 0 and main_done >= main_left * 0.6)):
+                main = max(live, key=lambda c: remain[c])
+                main_left = remain[main]
+                main_done = 0
+            plan = build_pallet(skus, remain, pool, Hlim, rnd, cons, pal_L, pal_W,
+                                prefer_skus=prefer_skus, main_force=main)
             if plan is None or plan["cartons"] == 0:
                 break
             for k, v in plan["consumed"].items():
                 remain[k] = remain.get(k, 0) - v
+            if plan.get("main"):
+                main_done += plan["consumed"].get(plan["main"], 0)
             pallets.append(plan)
+            # 下一个托盘沿用本托的【补位 SKU】(排除主 SKU) → 补位粘住不漂移,
+            # 相邻托盘成分一致, 同 SKU 在柜内集中成片。
+            # 注意: 不能把主 SKU 也传进去, 否则补位候选会随主角变化而漂移。
+            _pm = plan.get("main")
+            prefer_skus = set(s for s in (plan.get("skus") or ()) if s != _pm)
         if not pallets:
             continue
         key = (len(pallets), -sum(p["cartons"] for p in pallets))
@@ -1163,6 +1226,32 @@ def solve_pallet_mode(box_spec, skus, cons: Constraints, pal_spec):
     # 关键: pos 是「柜内托盘位」, 每个柜复用同一套 pos[0..n-1]。
     #       分配时**直接绑定位置**到托盘, 后续排序/校验/导出都读托盘自带的
     #       _slot/_rot, 不再反查索引 (反查会因排序重置索引而错位)。
+    # ---- 【同 SKU 集中】: 分配前先按「主 SKU」把托盘分组, 同主 SKU 的托盘
+    #       连续排在一起再装箱。
+    #       原因: 柜底托盘位是两排交错布局, 若同 SKU 的托盘散在柜内各处,
+    #       3D 里看到的就是「同一个颜色反复出现」(查理截图的现象)。
+    #       按主 SKU 分组后, 同一 SKU 占据连续的托盘位 → 视觉上是一整片。
+    def _pallet_main(pal):
+        cnt = {}
+        for l in pal.get("layers", []):
+            cnt[l["sku"]] = cnt.get(l["sku"], 0) + l["n"]
+        if not cnt:
+            return ""
+        return max(cnt.items(), key=lambda kv: (kv[1], kv[0]))[0]
+
+    # 分组: 主 SKU 相同的一组; 组内按重量降序 (重货组在前, 保持原意)
+    _grp = defaultdict(list)
+    for _p in best:
+        _grp[_pallet_main(_p)].append(_p)
+    _ordered = []
+    _grp_sorted = sorted(_grp.items(),
+                         key=lambda kv: (-max(_pallet_weight(p, smap_of(skus))
+                                         for p in kv[1]), kv[0]))
+    for _k, _ps in _grp_sorted:
+        _ps.sort(key=lambda p: (-_pallet_weight(p, smap_of(skus)), -p["h"]))
+        _ordered.extend(_ps)
+    best = _ordered
+
     containers = []
     for i, p in enumerate(best):
         if containers and len(containers[-1]) < len(pos):
@@ -1181,9 +1270,29 @@ def solve_pallet_mode(box_spec, skus, cons: Constraints, pal_spec):
     #     表现为「箱子超出托盘边界」。
 
     # 柜内排序: 重货托在前 (靠近柜门), 同重按高度降序
+    # ---- 【同 SKU 集中】: 分配到柜位时已按主 SKU 分组 (见上), 这里只需保证
+    #   排序**不破坏**这个分组 —— 按组内原有次序稳定排序即可。
+    #   注: 早期版本这里按重量全局排序, 会把同 SKU 的托盘打散到柜内各处。
     smap = {s.code: s for s in skus}
     for cc in containers:
-        cc.sort(key=lambda t: (-_pallet_weight(t[1], smap), -t[1]["h"]))
+        def _main_of(pal):
+            cnt = {}
+            for l in pal.get("layers", []):
+                cnt[l["sku"]] = cnt.get(l["sku"], 0) + l["n"]
+            if not cnt:
+                return ""
+            return max(cnt.items(), key=lambda kv: (kv[1], kv[0]))[0]
+        # 组序: 同主 SKU 的组按「该组最轻托盘」的重量序 (重货组在前)
+        grp_min = {}
+        for _slot, _p in cc:
+            m = _main_of(_p)
+            w = _pallet_weight(_p, smap)
+            if m and (m not in grp_min or w < grp_min[m]):
+                grp_min[m] = w
+        ordered = sorted(grp_min.items(), key=lambda kv: (-kv[1], kv[0]))
+        grp_rank = {m: i for i, (m, _) in enumerate(ordered)}
+        cc.sort(key=lambda t: (grp_rank.get(_main_of(t[1]), 999),
+                               -_pallet_weight(t[1], smap), -t[1]["h"]))
 
     # ---- 柜底裸地填充: 把余量箱装进柜内零散空间 (不放托盘的地方)
     #      仅在显式开启且已验证时启用 (当前默认关闭, 见 use_bare_area)
