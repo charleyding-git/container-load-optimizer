@@ -35,8 +35,10 @@ def parse_excel(path):
     约定:
       * 每个 working sheet = 一个批次 (同批次一起发运)
       * sheet 内表头 (第2行): 列名映射
-      * 必填列: SKU编码 / 长(mm) / 宽(mm) / 高(mm) / 箱数
-      * 可选列: 名称 / 单箱重量 / 每箱件数 / ECT / 限堆层数 / 备注
+      * 必填列: SKU编码 / 外箱长(mm) / 外箱宽(mm) / 外箱高(mm) / 箱数(外箱)
+      * 可选列: 品名 / 每箱装几件 / 外箱毛重(kg) / ECT / 限堆层数 / 备注
+      * 计量口径: 所有数量与尺寸都以外箱(运输纸箱)为单位。
+        外箱毛重 = 整箱毛重(含内件 + 外箱材料), 直接用于承重/重心校验。
 
     返回 {批次名: [SKU, ...], "_meta": {...}}
     """
@@ -72,9 +74,9 @@ def parse_excel(path):
                     colmap["cartons"] = j
                 if ("名称" in c or "品名" in c or "name" in cl) and "name" not in colmap:
                     colmap["name"] = j
-                if ("重量" in c or "weight" in cl or "kg" in cl) and "weight" not in colmap:
+                if ("重量" in c or "毛重" in c or "weight" in cl or "kg" in cl) and "weight" not in colmap:
                     colmap["weight"] = j
-                if ("件数" in c or "pcs" in cl or "每箱" in c) and "pcs" not in colmap:
+                if ("件数" in c or "几件" in c or "pcs" in cl or "每箱" in c) and "pcs" not in colmap:
                     colmap["pcs"] = j
                 if ("ect" in cl or "边压" in c) and "ect" not in colmap:
                     colmap["ect"] = j
